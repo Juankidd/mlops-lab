@@ -1,0 +1,53 @@
+# Pipeline MLOps completo con DVC
+stages:
+
+  # STAGE 1: Data Engineering — Ingesta de datos
+  ingest:
+    cmd: python src/data/ingest.py
+    deps:
+      - src/data/ingest.py
+    outs:
+      - data/raw/housing.csv
+    desc: "Descarga y guarda el dataset raw"
+
+  # STAGE 2: Feature Engineering — Feature Store
+  build_features:
+    cmd: python src/features/build.py
+    deps:
+      - src/features/build.py
+      - data/raw/housing.csv
+    outs:
+      - data/processed/features.csv
+    desc: "Crea features desde datos raw"
+
+  # STAGE 3: ML Model Engineering — Entrenamiento
+  train:
+    cmd: python src/models/train.py
+    deps:
+      - src/models/train.py
+      - data/processed/features.csv
+      - params.yaml
+    params:
+      - model
+      - data
+    outs:
+      - models/model.pkl
+    metrics:
+      - metrics/scores.json:
+          cache: false
+    desc: "Entrena el modelo y registra en MLflow"
+
+  # STAGE 4: Evaluación
+  evaluate:
+    cmd: python src/models/evaluate.py
+    deps:
+      - src/models/evaluate.py
+      - models/model.pkl
+      - data/processed/features.csv
+    metrics:
+      - metrics/evaluation.json:
+          cache: false
+    plots:
+      - metrics/feature_importance.csv:
+          x: feature
+          y: importance

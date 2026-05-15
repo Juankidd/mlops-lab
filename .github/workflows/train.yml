@@ -1,0 +1,65 @@
+# CI/CD: Train pipeline — se dispara con cada push
+name: MLOps Train Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'params.yaml'
+      - 'dvc.yaml'
+  workflow_dispatch:  # Permite disparar manualmente
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Instalar dependencias
+      run: pip install -r requirements.txt
+
+    - name: # Tests unitarios
+      run: pytest tests/ -v --tb=short
+
+    - name: Pull datos con DVC
+      run: dvc pull
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+
+    - name: Ejecutar pipeline DVC completo
+      run: dvc repro
+      env:
+        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+
+    - name: Verificar métricas
+      run: |
+        dvc metrics show
+        python -c "
+        import json
+        with open('metrics/evaluation.json') as f:
+            m = json.load(f)
+        assert m['promoted'], f'Modelo no pasó: RMSE={m[\"rmse\"]}'
+        print('✅ Modelo listo para deploy')
+        "
+
+    - name: Push resultados
+      run: dvc push && git add metrics/ && git commit -m "ci: update metrics" || true
+
+    - name: Trigger deploy
+      if: success()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner, repo: context.repo.repo,
+            workflow_id: 'deploy.yml', ref: 'main'
+          })

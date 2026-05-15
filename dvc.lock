@@ -1,0 +1,89 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python src/data/ingest.py
+    deps:
+    - path: src/data/ingest.py
+      hash: md5
+      md5: 23022ec077f53ebcd42a9c35e0ad906b
+      size: 1703
+    outs:
+    - path: data/raw/housing.csv
+      hash: md5
+      md5: 9e055a3d491fd5d2e640ba1028a1c71b
+      size: 2038221
+  build_features:
+    cmd: python src/features/build.py
+    deps:
+    - path: data/raw/housing.csv
+      hash: md5
+      md5: 9e055a3d491fd5d2e640ba1028a1c71b
+      size: 2038221
+    - path: src/features/build.py
+      hash: md5
+      md5: ac1c2e09e9127710d73532aef29b6f87
+      size: 1389
+    outs:
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 4b178b8ebd0f502fbab8ab30c6bc0ac5
+      size: 3559917
+  train:
+    cmd: python src/models/train.py
+    deps:
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 4b178b8ebd0f502fbab8ab30c6bc0ac5
+      size: 3559917
+    - path: params.yaml
+      hash: md5
+      md5: d152e8a9016af026ddab336555d01821
+      size: 308
+    - path: src/models/train.py
+      hash: md5
+      md5: 61ca03c15644e9c51572dd24f97f732c
+      size: 3447
+    params:
+      params.yaml:
+        data:
+          test_size: 0.2
+          random_state: 42
+          scale_features: true
+        model:
+          n_estimators: 100
+          max_depth: 10
+          min_samples_split: 5
+          learning_rate: 0.1
+    outs:
+    - path: metrics/scores.json
+      hash: md5
+      md5: 54660b9bd0808b3a629861265c9caaa2
+      size: 64
+    - path: models/model.pkl
+      hash: md5
+      md5: c34ca4ce7582fbf08cc0f5b090281405
+      size: 13907761
+  evaluate:
+    cmd: python src/models/evaluate.py
+    deps:
+    - path: data/processed/features.csv
+      hash: md5
+      md5: 4b178b8ebd0f502fbab8ab30c6bc0ac5
+      size: 3559917
+    - path: models/model.pkl
+      hash: md5
+      md5: c34ca4ce7582fbf08cc0f5b090281405
+      size: 13907761
+    - path: src/models/evaluate.py
+      hash: md5
+      md5: 91564caec85f98342c38c9ee67db8706
+      size: 2607
+    outs:
+    - path: metrics/evaluation.json
+      hash: md5
+      md5: b16726436cf1a6dd257362855291aaff
+      size: 73
+    - path: metrics/feature_importance.csv
+      hash: md5
+      md5: abfa347794dfe1ad26f9920bb53fcbb8
+      size: 504

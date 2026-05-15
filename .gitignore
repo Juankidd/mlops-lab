@@ -1,0 +1,9 @@
+echo ".venv/
+__pycache__/
+*.pyc
+.env
+mlruns/
+data/raw/
+data/processed/
+models/
+metrics/" > .gitignore
