@@ -37,8 +37,7 @@ jobs:
 
     - name: Ejecutar pipeline DVC completo
       run: dvc repro
-      env:
-        MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      
 
     - name: Verificar métricas
       run: |

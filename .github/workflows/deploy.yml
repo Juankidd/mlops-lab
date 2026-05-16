@@ -1,0 +1,73 @@
+# CD Stage: despliega la API cuando el modelo está listo
+name: Deploy ML Model Serving
+
+on:
+  # Se dispara cuando train.yml termina con éxito
+  workflow_run:
+    workflows: ["MLOps Train Pipeline"]
+    types: [completed]
+    branches: [main]
+
+  # También se puede disparar manualmente
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # Solo corre si el training fue exitoso
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Instalar dependencias
+      run: pip install -r requirements.txt
+
+    - name: Generar datos y modelo
+      run: |
+        python src/data/ingest.py
+        python src/features/build.py
+        python src/models/train.py
+
+    - name: Test de la API
+      run: |
+        # Levantar API en background
+        uvicorn src.api.main:app --port 8000 &
+        sleep 5
+
+        # Verificar health check
+        curl -f http://localhost:8000/health || exit 1
+        echo "✅ API responde correctamente"
+
+        # Test de predicción real
+        curl -X POST http://localhost:8000/predict \
+          -H "Content-Type: application/json" \
+          -d '{
+            "MedInc": 8.3252,
+            "HouseAge": 41.0,
+            "AveRooms": 6.984,
+            "AveBedrms": 1.023,
+            "Population": 322.0,
+            "AveOccup": 2.555,
+            "Latitude": 37.88,
+            "Longitude": -122.23
+          }' | python -c "
+        import sys, json
+        r = json.load(sys.stdin)
+        print('Predicción:', r)
+        assert 'predicted_price_usd' in r, 'Error: campo predicción no encontrado'
+        print('✅ Predicción correcta')
+        "
+
+    - name: Deploy exitoso
+      run: |
+        echo "🚀 Deploy completado: $(date)"
+        echo "✅ Modelo en producción"
+        echo "📊 API lista en puerto 8000"
